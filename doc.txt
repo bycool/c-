@@ -57,4 +57,45 @@
 		1，如果引用作为参数，相当于指针变量做参数
 			int a = 10; void change(int* a) { *a=10;}  change(&a);
 			int a = 10; void change(int &a) { a = 10; } change(a);
-	
+
+引用的本质是： 引用在C++中的内部实现了一个指针常量,且引用与类型指针占空间大小一样。
+
+7,常量指针
+	int a = 10;  在栈区
+	int arr[10];  arr是一个常量指针，在常量区。10个int的数组在栈区。
+	int &b = a;  等价 int* const b = &a;   *b在常量区.
+
+8,引用作为函数返回值
+	int& geta(){
+		int a = 10;
+		return a;
+	}
+	void main(){
+		int a = 0;
+		a = geta();  此处调用函数时，返回的是a的引用的值，也就是10，所以main::a最后被返回的是10.
+		int &ra = geta(); //ra变成局部变量的a，局部变量被销毁，这个引用就会出问题。所以返回类型为引用的函数不能用引用变量接受返回值。
+	}
+
+9,指针引用
+	指针：
+		void getmem(char** p){
+			*p = (char*)malloc(10);
+		}
+	指针引用:
+		void getmem(char* &p){
+			p = (char*)malloc(10);
+		}
+
+10,const引用
+	const int a = 10;
+	int& ra = a; //error
+	const int& ra = a; ok
+
+11,内联函数
+	inline函数是编译器对函数进行类似宏定义(预处理器)的展开，但会对参数进行类型检验。
+	函数体不能太大
+
+12,参数的默认参数和占位参数
+	默认参数就是给函数的参数一个默认值，如果调用函数时没有给这个参数传参，则用默认值，如果有的参数有默认值，有的没有，则有默认值的参数写在参数列表最后面。
+
+	亚元: void test(int, int),两个占位参数，调用时，必须给这两个参数传参。

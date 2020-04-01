@@ -2,7 +2,10 @@
 
 using namespace std;
 
-int f(){
+int g_val;
+// int g_val = 1; 
+
+int f(int ,int){
 	return 10;
 }
 

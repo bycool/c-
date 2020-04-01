@@ -1,0 +1,98 @@
+第一章
+一，核心模块间的互换
+	1，初始化模块
+		当命令行启动服务器时(service mysqld start)，初始化模块结果控制权：
+		1.1 解析配置文件和命令行参数
+		1.2 分配全局存储缓冲区
+		1.3 初始化全局变量和结构，加载访问控制表
+		1.4 执行大量其它初始任务
+	一旦完成初始化，<初始化模块>将控制权交给<链接管理器>,<链接管理器>开始监听来自回路中的客户端的链接。
+	code: sql/mysqld.cc
+	mysql_main()
+		init_common_variables():通用变量初始化
+			init_thread_environment():线程环境初始化，锁的初始化等。
+		init_server_components():服务器部分的初始化。各种插件.
+		grant_init():初始化表/列等级检测，加载mysql数据库内的表信息。
+		init_slave():初始化slave结构体
+		
+	2，连接管理器
+		连接管理器监听来自客户端的连接，然后将请求派发给线程管理器。
+		handle_connections_sockets():处理新链接，分配新进程处理它们。
+		mysql_main()
+			handle_connections_sockets(){
+				while(!abort_loop){
+					select((int)max_used_connection, &readFDs,0,0,0);  //监听客户端描述符
+				}
+			}
+		在handle_connections_sockets函数内，创建socket，监听客户端的链接。
+
+	3，线程管理器
+		线程管理器负责跟踪线程，确保分配线程，以处理来自客户端的链接。
+		在处理连接的管理器的while循环中，当监听到客户端socket的链接后，创建THD用于客户端的链接管理，主要存储各种信息用于线程创建，
+		创建线程调用mysql的回调函数add_connections ==> do_handle_one_connection @sql/sql_connect.cc
+
+	4，连接线程
+		链接线程是在已经建立的链接上处理客户端请求的工作核心。handle_one_connection().
+
+	5，用户验证模块
+		用户验证模块验证所连接的用户，并对包含该用户层权限信息的结构和变量进行初始化。
+		check_connection() 				@sql/sql_connect.cc
+		acl_check_host()   				@sql/sql_acl.cc
+			create_random_string()		@sql/password.c
+		acl_getroot()                   @sql/sql_acl.cc  获取未验证用户的证书，限制资源检测
+
+	6，访问控制模块
+		访问控制模块检验客户端用户是否具有足够权限来执行所请求的操作。
+		check_grant()			@sql/sql_acl.cc
+		check_table_access()	@sql/sql_parse.cc
+		check_grant_column()	@sql/sql_acl.cc
+		acl_get()				@sql/sql_acl.cc
+
+	7，分析器
+		解析器负责解析查询并生成解析树。入口在sql/sql_parse.cc mysql_parse().
+
+	8，命令调度器
+		命令调度器负责将请求转发给知道如何处理这些请求的较低层次的模块。
+		do_command()
+		dispatch_command()
+
+	9，查询高速缓存模块
+		Query_cache::store_query()
+		Query_cache::send_result_to_client()
+
+	10，优化器
+		优化器负责创建回答查询的最佳策略，并执行该策略，向客户端提交结果。
+
+	11，表管理器
+		表管理器负责创建，读取和修改定义文件(.frm扩展名),维护表描述符高速缓存(即表高速缓存)，以及管理表锁。
+
+	12，表修改模块
+		这一模块集负责诸如表创建，删除，重命名，移除，更新或插入之类的操作。
+
+	13，表维护模块
+		表维护模块负责表维护操作，诸如检查，修理，备份，恢复，优化(碎片整理)及解析(更新键分布统计)。
+
+	14，状态报告模块
+		状态报告模块负责回答关于服务器配置设置，新跟跟踪变量，表结构信息，复制进度，表高速缓存状态等的查询。
+
+	15，抽象存储引擎接口(表处理器)
+		本模块实现了一个名为handler的凑像类和一个名为handlerton的结构
+
+	16，存储引擎的实现(mylSAM,innoDB,MEMORY, berkeley DB)
+		每个存储引擎都通过扩展前面提过的handler类提供了一套操作标准接口。
+
+	17，日志记录模块
+		日志记录模块负责维护较高层次的(逻辑)日志。一个存储引擎可能会为了本身的目的而额外维护自己的低层次(物理或逻辑)日志，但日志记录模块却与此无关，存储引擎自己会负责完成。
+
+第三章 核心类，结构，变量及API
+	THD类定义线程描述符，其中包含一些与处理给定请求的线程相关的信息。
+	class THD {
+		THD::Statement.LEX *lex;  									//查询分析树的描述符
+		THD::Statement.CSET_STRING query_string; 					//查询的命令的文本
+		THD::Statement::Query_arena.Item *free_list;				//当前查询的所有分析树节点的链接列表。
+		THD::Statement::Query_arena.MEM_ROOT *mem_root;				//线程内存池
+		THD.NET net;												//客户端链接描述符
+		THD.Protocol *protocol;										//客户端/服务器通信协议描述符。
+		THD.HASH    user_vars;										//用于存储查询中使用的用户变量散列,例如:set @a:=31; select col1 from t1 where col2=@a;
+		
+	};
